@@ -1,0 +1,23 @@
+questions : 
+What's movies you like and why?
+what‘s genres you like to watch?
+What are You in mood for ?
+
+testcase-1: 
+i like marvel movies  and super hero movies because i like to save and help peoples 
+
+the genres i like to watch are action and crime 
+currenlty i m in mood to watch some fighting and comedy.
+
+testcase-2 : 
+
+I love action and war movies because they’re thrilling, intense, and often showcase incredible courage, strategy, and resilience.
+
+My favorite genres are action and war. 
+
+I’m in the mood for an adrenaline-pumping war epic or a fast-paced action film with jaw-dropping stunts!
+
+testcase-3:
+I love action and war movies because they’re thrilling, intense, and often showcase incredible courage, strategy, and resilience.
+My favorite genres are action and war. I enjoy movies with high stakes, intense battles, and compelling characters.
+I’m in the mood for an adrenaline-pumping war epic or a fast-paced action film with jaw-dropping stunts!

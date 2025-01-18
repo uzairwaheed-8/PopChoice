@@ -8,12 +8,12 @@ import { pipeline } from '@xenova/transformers';
 // import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { useNavigate } from 'react-router-dom';
 
-const Qs = ({ setRes }) => {
+const Qs = ({ setRes, setImg, setTitle,setList }) => {
     const [ques1, setQues1] = useState("");
     const [ques2, setQues2] = useState("");
     const [ques3, setQues3] = useState("");
     const navigator = useNavigate()
-    // const [embed, setEmbed] = useState(null);
+    const [embed, setEmbed] = useState(null);
     const [embedStore, setEmbedStore] = useState([]);
     const [store, setStore] = useState(null);
     const style = {
@@ -46,21 +46,30 @@ const Qs = ({ setRes }) => {
         try {
             const chatMsg = [{
                 role: 'system',
-                content: `You are an enthusiastic Movies expert who loves recommending movies to people. You will be given two pieces of information - some context about Movies and a question. Your main job is to recommend a movie using the provided context.If you are unsure and cannot find the Movie in the context, say, "Sorry, I don't know the answer." Please do not make up the answers.`
-            },{
+                content: `You are an enthusiastic Movies expert who loves recommending movies to people. You will be given two pieces of information - list of movies as context and user preferences . Your main job is to recommend a movie using the provided context.If you are unsure and cannot find the Movie in the context, say, "Sorry, I don't know the answer." Please do not make up the answers.`
+                // content: `You are a passionate and knowledgeable movie enthusiast who loves helping people discover great films. You will be provided with two inputs:
+                // A list of movies as context (including their title, popularity, release date, genre, description, and poster URL).
+                // User preferences
+                // Your task is to recommend a movie from the provided context that best matches the user's preferences. When recommending, act like a friendly movie expert, offering thoughtful suggestions rather than copying the context directly. Use the information creatively to make the recommendation personal and engaging.
+                // Complete sentences and don't generate incomplete sentences.
+                // If none of the movies in the context match the user's preferences, respond with: "Sorry, I don’t know the answer." Do not fabricate movies or details.`
+            }, {
                 role: 'user',
-                content: `Context: ${context} Question: ${question}`
+                content: `Context: ${context} user Prefernces: ${question}`
             }
-        ]
+            ]
             const out = await hf.chatCompletion({
                 model: "mistralai/Mistral-7B-Instruct-v0.2",
+                // model: "HuggingFaceH4/starchat2-15b-v0.1",
+                // model: "meta-llama/Llama-2-7b-chat-hf",
                 messages: chatMsg,
                 temperature: 0.5,
                 seed: 0,
             })
             console.log(out);
             console.log(out.choices[0].message.content);
-            setRes(out.choices[0].message.content);
+            // setRes(out.choices[0].message.content);
+            return out.choices[0].message.content;
         } catch (error) {
             console.error('Error generating response:', error);
         }
@@ -76,15 +85,31 @@ const Qs = ({ setRes }) => {
             setQues3("");
 
             const generatedEmbed = await genEmbed(concatenatedQuestions);
-            // setEmbed(generatedEmbed);
+            setEmbed(generatedEmbed);
 
             if (generatedEmbed) {
                 const similarMovies = await findSimilar(generatedEmbed);
                 // console.log(similarMovies);
                 // setRes(similarMovies);
-                resGen(concatenatedQuestions, similarMovies)
+                const moviearr = similarMovies.split("||\n");
+                setList(moviearr);
+                console.log(moviearr);
+                const llmRes = await resGen(concatenatedQuestions, similarMovies);
+                const recommend = llmRes.split("||\n");
+                setRes(recommend[recommend.length - 1]);
+                console.log("1st", recommend[recommend.length])
+                console.log("2nd", recommend);
+                moviearr.map((movie) => {
+                    let title = movie.split("Popularity");
+                    title = title[0].split("Title: ");
+                    let condi = recommend[recommend.length - 1].match(title[1].trim());
+                    if (condi) {
+                        console.log('I m in if : ', title[1]);
+                        setImg(movie.split("poster_path : ")[1]);
+                        setTitle(title[1]);
+                    }
+                });
             }
-            console.log(store);
             navigator('/res');
 
         } catch (error) {
@@ -92,11 +117,13 @@ const Qs = ({ setRes }) => {
         }
     };
 
-    // useEffect(() => {
-    //     if (store && embedStore.length === 0) {
-    //         createAndStoreEmbeddings();
-    //     }
-    // }, [store]);
+    useEffect(() => {
+        // if (store && embedStore.length === 0) {
+        //     createAndStoreEmbeddings();
+        // }
+        console.log(store);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [store]);
 
     const genEmbed = async (text) => {
         try {
@@ -120,7 +147,7 @@ const Qs = ({ setRes }) => {
             const embeddingData = await Promise.all(
                 store.map(async (movie) => {
                     const genre = getGenresFromIds(movie.genre_ids);
-                    const text = `Title: ${movie.title}  Popularity: ${movie.popularity}  Release date: ${movie.release_date}  Genre: ${genre.join(", ")}  Description: ${movie.overview}`;
+                    const text = `Title: ${movie.title}  Popularity: ${movie.popularity}  Release date: ${movie.release_date}  Genre: ${genre.join(", ")}  Description: ${movie.overview} poster_path : https://image.tmdb.org/t/p/w500${movie.poster_path}`;
                     const embed = await genEmbed(text);
                     return { content: text, embedding: embed };
                 })
@@ -137,17 +164,17 @@ const Qs = ({ setRes }) => {
                 console.error('Error saving data to Supabase:', error);
             } else {
                 console.log('Data saved successfully to Supabase:', data);
-                // setEmbedStore(embeddingData.map(item => item.embedding));
+                setEmbedStore(embeddingData.map(item => item.embedding));
             }
         } catch (error) {
             console.error('Error in createAndStoreEmbeddings:', error);
         }
     };
 
- 
+
     const findSimilar = async (inp) => {
         try {
-            console.log('Finding similar movies...'); 
+            console.log('Finding similar movies...');
             const { data, error } = await supabase.rpc('match_documents', {
                 query_embedding: inp,
                 match_threshold: 0.50,
@@ -167,27 +194,12 @@ const Qs = ({ setRes }) => {
             console.log('Matches found:', data); // Debugging
             // setRes(data);
             const match = data.map(obj => obj.content).join('||\n');
-            console.log('Matching movies:', match); 
+            console.log('Matching movies:', match);
             return match;
         } catch (error) {
             console.error('Error during findSimilar:', error);
         }
     };
-
-    // const splitDocument = async (document) => {
-    //     try {
-    //         const response = await fetch(document);
-    //         const text = await response.text();
-    //         const splitter = new RecursiveCharacterTextSplitter({
-    //             chunkSize: 250,
-    //             chunkOverlap: 35,
-    //         });
-    //         const output = await splitter.createDocuments([text]);
-    //         return output;
-    //     } catch (error) {
-    //         console.error('Error splitting document:', error);
-    //     }
-    // };
 
     return (
         <div style={style} className='bg-[#000C36] text-white p-4 lg:p-8 flex flex-col justify-center items-center min-h-screen font-sans'>
